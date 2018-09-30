@@ -146,6 +146,8 @@ var invokeChaincode = function(peerNames, channelName, chaincodeName, fcn, args,
 		return 'Failed to send proposal due to error: ' + err.stack ? err.stack :
 			err;
 	}).then((response) => {
+		logger.info('response-------------------------------------')
+		logger.info(response)
 		if (response.status === 'SUCCESS') {
 			logger.info('Successfully sent transaction to the orderer.');
 			return tx_id.getTransactionID();

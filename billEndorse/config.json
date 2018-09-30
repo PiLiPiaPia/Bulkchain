@@ -16,6 +16,7 @@
    "mockupUsers": [
       {
          "username": "admin",
+         "usertype": "exchange",
          "name": "管理员",
          "passwd": "123456",
          "cmId": "HODR01",
@@ -23,24 +24,35 @@
       },
       {
          "username": "alice",
-         "name": "A公司",
+         "usertype": "member",
+         "name": "A会员",
          "passwd": "123456",
          "cmId": "ACMID",
-         "Acct": "A公司"
+         "Acct": "A会员"
       },
       {
          "username": "bob",
-         "name": "B公司",
+         "usertype": "member",
+         "name": "B会员",
          "passwd": "123456",
          "cmId": "BCMID",
-         "Acct": "B公司"
+         "Acct": "B会员"
       },
       {
          "username": "carle",
-         "name": "C公司",
+         "usertype": "storage",
+         "name": "C仓库",
          "passwd": "123456",
          "cmId": "CCMID",
-         "Acct": "C公司"
+         "Acct": "C仓库"
+      },
+      {
+         "username": "bank1",
+         "usertype": "bank",
+         "name": "D银行",
+         "passwd": "123456",
+         "cmId": "DCMID",
+         "Acct": "D银行"
       }
    ]
 }

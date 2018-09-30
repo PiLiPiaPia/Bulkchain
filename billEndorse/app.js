@@ -424,7 +424,7 @@ app.post('/channels/:channelName/chaincodes/:chaincodeName/invoke', function(req
     try {
         invoke.invokeChaincode(peers, channelName, chaincodeName, fcn, args, req.username, req.orgname)
             .then(function(message) {
-            	if (message.indexOf('error') > -1) {
+            	if (message.indexOf('error') > -1 || message.indexOf('failed') > -1 || message.indexOf('Error') > -1 || message.indexOf('Failed') > -1) {
                     res.send({
                         success: false,
                         message: message
