@@ -86,5 +86,13 @@
     "videogular-poster": "~0.7.0",
     "waves": "~0.7.2",
     "ng-dialog": "^0.6.1"
+  },
+  "resolutions": {
+    "angular-cookies": "~1.2.26",
+    "angular-touch": "~1.2.*",
+    "angular": "1.2.32",
+    "fullcalendar": "~2.2.6",
+    "angular-sanitize": "~1.2.0",
+    "moment": "~2.8.3"
   }
 }
