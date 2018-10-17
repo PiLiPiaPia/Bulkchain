@@ -20,6 +20,7 @@ const (
 	Check_State_Checking = "Checking"
 	Check_State_CheckedResolved = "Resolved"
 	Check_State_CheckedRejected = "Rejected"
+        Check_State_Finished = "Finished"
 )
 
 type Member struct{
@@ -866,6 +867,7 @@ func (a *mychaincode) registerInbound(stub shim.ChaincodeStubInterface,args []st
 	}
 		
 	request.WarehouseReceipts = wrs
+        request.CheckState = Check_State_Finished
 	bReq,err = json.Marshal(request)
 	if err != nil {
 		res := getRetString(1,"BulkchainChaincode Invoke registerInbound marshal request error")
