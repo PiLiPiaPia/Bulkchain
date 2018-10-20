@@ -20,7 +20,7 @@ const (
 	Check_State_Checking = "Checking"
 	Check_State_CheckedResolved = "Resolved"
 	Check_State_CheckedRejected = "Rejected"
-        Check_State_Finished = "Finished"
+    Check_State_Finished = "Finished"
 )
 
 type Member struct{
@@ -477,7 +477,7 @@ func isUserTypeValid(userType string) bool {
 }
 
 func isCheckStateValid(state string) bool {
-	states := [3]string{Check_State_Checking,Check_State_CheckedRejected,Check_State_CheckedResolved}
+	states := [3]string{Check_State_Checking,Check_State_CheckedRejected,Check_State_CheckedResolved,Check_State_Finished}
 	for _,v := range states {
 		if v == state {
 			return true
@@ -867,7 +867,7 @@ func (a *mychaincode) registerInbound(stub shim.ChaincodeStubInterface,args []st
 	}
 		
 	request.WarehouseReceipts = wrs
-        request.CheckState = Check_State_Finished
+    request.CheckState = Check_State_Finished
 	bReq,err = json.Marshal(request)
 	if err != nil {
 		res := getRetString(1,"BulkchainChaincode Invoke registerInbound marshal request error")
@@ -976,6 +976,13 @@ func (a *mychaincode) sendRegisterRequest(stub shim.ChaincodeStubInterface,args 
 	request.TxType = TxType_RegisterRequest
 	request.RegisteringWarehouseReceipt = wr
 	request.CheckState = Check_State_Checking
+	if request.RegisteringQuantity <= 0 {
+		request.RegisteringQuantity = wr.Quantity
+	} else {
+		//replace this line when needs that function of registeringQuantity
+		request.RegisteringQuantity = wr.Quantity
+	}
+
 	var tx Transaction
 	bReq,err := json.Marshal(request)
 	if err != nil {
@@ -1132,17 +1139,19 @@ func (a *mychaincode) sendDeliveryRequest(stub shim.ChaincodeStubInterface,args 
 		request.DeliveryVarietyCode = wr.VarietyCode
 		request.DeliveryQuantity = wr.Quantity
 		request.TradeUnit = varieties[wr.VarietyCode].MinDeliveryHands 
+
+		//check the holder
+		if wr.WarehouseReceiptHolderId != request.ClientId || wr.MemberId != request.MemberId {
+			res := getRetString(1,"BulkchainChaincode Invoke sendDeliveryRequest the client is not the holder of the WarehouseReceipt")
+			return shim.Error(res)
+		}
+		///check the type and state
+		if wr.Type != WarehouseReceipt_Type_Standard || wr.State != State_FLOWABLE {
+			res := getRetString(1,"BulkchainChaincode Invoke sendDeliveryRequest the operation is illegal because of the state and type of WarehouseReceipt ")
+			return shim.Error(res)
+		}
 	}
-	//check the holder
-	if wr.WarehouseReceiptHolderId != request.ClientId || wr.MemberId != request.MemberId {
-		res := getRetString(1,"BulkchainChaincode Invoke sendDeliveryRequest the client is not the holder of the WarehouseReceipt")
-		return shim.Error(res)
-	}
-	///check the type and state
-	if wr.Type != WarehouseReceipt_Type_Standard || wr.State != State_FLOWABLE {
-		res := getRetString(1,"BulkchainChaincode Invoke sendDeliveryRequest the operation is illegal because of the state and type of WarehouseReceipt ")
-		return shim.Error(res)
-	}
+	
 
 
 	//set wr state and record history
@@ -1368,7 +1377,7 @@ func (a *mychaincode) matchDeliveryRequest(stub shim.ChaincodeStubInterface,args
 					matchBuyerState[buyerTxId] = false
 				}
 
-				if float64(buyerQuantity) * (1.0 + matchRate) <= float64(sellerQuantity) && matchBuyerState[buyerTxId] == false {
+				if float64(buyerQuantity) <= float64(sellerQuantity) * (1.0 + matchRate) && float64(buyerQuantity) >= float64(sellerQuantity) * (1.0 - matchRate) && matchBuyerState[buyerTxId] == false {
 					matchSellerToBuyerResults[sellerTxId] = buyerTxId
 					matchSellerState[sellerTxId] = true
 					matchBuyerState[buyerTxId] = true
@@ -1778,7 +1787,7 @@ func (a *mychaincode) confirmPledgeRequest(stub shim.ChaincodeStubInterface,args
 	}
 
 	//validate
-	if checkResult.ConfirmState != ConfirmState_ConfirmRejected || checkResult.ConfirmState != ConfirmState_ConfirmResolved {
+	if checkResult.ConfirmState != ConfirmState_ConfirmRejected && checkResult.ConfirmState != ConfirmState_ConfirmResolved {
 		res := getRetString(1,"BulkchainChaincode Invoke confirmPledgeRequest ConfirmState is invalid")
 		return shim.Error(res)
 	}
@@ -2234,7 +2243,7 @@ func (a *mychaincode) sendOutboundRequest(stub shim.ChaincodeStubInterface,args 
 	}
 	stub.PutState(ClientIdTxIdKey, []byte(TxType_RegisterRequest))
 
-	WarehouseIdTxIdKey, err := stub.CreateCompositeKey(Index_Exchange_TxId,[]string{wr.GoodsHolderId, request.TransactionId})
+	WarehouseIdTxIdKey, err := stub.CreateCompositeKey(Index_Warehouse_TxId,[]string{wr.GoodsHolderId, request.TransactionId})
 	if err != nil {
 		res := getRetString(1,"BulkchainChaincode Invoke sendOutboundRequest put search table failed")
 		return shim.Error(res)
@@ -2402,7 +2411,7 @@ func (a *mychaincode) registerOutbound(stub shim.ChaincodeStubInterface,args []s
 	}
 
 	if request.CheckState != Check_State_CheckedResolved {
-		res := getRetString(1,"BulkchainChaincode Invoke registerOutbound CheckState is not resolved")
+		res := getRetString(1,"BulkchainChaincode Invoke registerOutbound CheckState is not resolved or has been outbounded")
 		return shim.Error(res)
 	}
 
@@ -2441,6 +2450,7 @@ func (a *mychaincode) registerOutbound(stub shim.ChaincodeStubInterface,args []s
 	}
 
 	//put request
+	request.CheckState = Check_State_Finished
 	bReq,err := json.Marshal(request)
 	if err != nil {
 		res := getRetString(1,"BulkchainChaincode Invoke registerOutbound marshal request failed")
