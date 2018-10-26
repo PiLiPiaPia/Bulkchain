@@ -765,7 +765,7 @@ func (a *mychaincode) registerInbound(stub shim.ChaincodeStubInterface,args []st
 		res := getRetString(1,"BulkchainChaincode Invoke registerInbound GoodsListIndeed should not be null")
 		return shim.Error(res)
 	}
-	if request.GoodsListIndeed != nil {
+	if request.GoodsListIndeed != nil && len(request.GoodsListIndeed) > 0 {
 		res := getRetString(1,"BulkchainChaincode Invoke registerInbound request has been registered")
 		return shim.Error(res)
 	}
@@ -1532,7 +1532,7 @@ func (a *mychaincode) matchDeliveryRequest(stub shim.ChaincodeStubInterface,args
 			}
 		}
 		//put matching result in search tables
-
+		
 
 		//delete matching tables
 		
