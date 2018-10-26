@@ -227,9 +227,13 @@ app.post('/login', function(req, res) {
         if (oldtoken != null) {
 
             jwt.verify(oldtoken, app.get('secret'), function(err, decoded) {
-                if (decoded == undefined || decoded.password != password) {
+                if (decoded == undefined) {
+                    clearToken(mockupUser.username);
+                    resolve({});
+                } 
+                else if (decoded.password != password) {
                     reject({});
-                }
+                } 
                 resolve({});
             });
         }else {
