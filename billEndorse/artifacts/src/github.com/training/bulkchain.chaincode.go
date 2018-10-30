@@ -477,7 +477,7 @@ func isUserTypeValid(userType string) bool {
 }
 
 func isCheckStateValid(state string) bool {
-	states := [3]string{Check_State_Checking,Check_State_CheckedRejected,Check_State_CheckedResolved,Check_State_Finished}
+	states := [4]string{Check_State_Checking,Check_State_CheckedRejected,Check_State_CheckedResolved,Check_State_Finished}
 	for _,v := range states {
 		if v == state {
 			return true
