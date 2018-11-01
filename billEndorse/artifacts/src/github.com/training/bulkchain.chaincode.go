@@ -1370,12 +1370,15 @@ func (a *mychaincode) matchDeliveryRequest(stub shim.ChaincodeStubInterface,args
 		matchSellerToBuyerResults := make(map[string]string)
 		matchSellerState := make(map[string]bool)
 		matchBuyerState := make(map[string]bool)
+		//initialize
+		for buyerTxId,buyerQuantity := range buyerReqs {
+			matchBuyerState[buyerTxId] = false
+		}
+			
+		
 		for sellerTxId,sellerQuantity := range sellerReqs {
 			matchSellerState[sellerTxId] = false
 			for buyerTxId,buyerQuantity := range buyerReqs {
-				if _,ok := matchBuyerState[buyerTxId];!ok {
-					matchBuyerState[buyerTxId] = false
-				}
 
 				if float64(buyerQuantity) <= float64(sellerQuantity) * (1.0 + matchRate) && float64(buyerQuantity) >= float64(sellerQuantity) * (1.0 - matchRate) && matchBuyerState[buyerTxId] == false {
 					matchSellerToBuyerResults[sellerTxId] = buyerTxId
@@ -1535,12 +1538,140 @@ func (a *mychaincode) matchDeliveryRequest(stub shim.ChaincodeStubInterface,args
 		
 
 		//delete matching tables
-		
+		//delete buyer keys
+		for buyerTxIdIterator.HasNext() {
+			kv,_ := buyerTxIdIterator.Next()
+			_,compositeKeyParts,err := stub.SplitCompositeKey(kv.Key)
+			if err != nil {
+				res := getRetString(1,"BulkchainChaincode matchDeliveryRequest SplitCompositeKey error")
+				return shim.Error(res)
+			}
+	
+			DeliveryTypeVarietyCodeTxIdKey,err := stub.CreateCompositeKey(Index_DeliveryType_VarietyCode_TxId, compositeKeyParts)
+			if err != nil {
+				res := getRetString(1,"BulkchainChaincode Invoke matchDeliveryRequest CreateCompositeKey failed")
+				return shim.Error(res)
+			}
+			err = stub.DelState(DeliveryTypeVarietyCodeTxIdKey)
+			if err != nil {
+				res := getRetString(1,"BulkchainChaincode Invoke matchDeliveryRequest DelCompositeKey failed")
+				return shim.Error(res)
+			}
+		}
+
+		//delete sellers keys
+		sellerReqs := make(map[string]int)
+		for sellerTxIdIterator.HasNext() {
+			kv,_ := sellerTxIdIterator.Next()
+			_,compositeKeyParts,err := stub.SplitCompositeKey(kv.Key)
+			if err != nil {
+				res := getRetString(1,"BulkchainChaincode Invoke matchDeliveryRequest SplitCompositeKey failed")
+				return shim.Error(res)
+			}
+			
+			DeliveryTypeVarietyCodeTxIdKey,err := stub.CreateCompositeKey(Index_DeliveryType_VarietyCode_TxId, compositeKeyParts)
+			if err != nil {
+				res := getRetString(1,"BulkchainChaincode Invoke matchDeliveryRequest CreateCompositeKey failed")
+				return shim.Error(res)
+			}
+			err = stub.DelState(DeliveryTypeVarietyCodeTxIdKey)
+			if err != nil {
+				res := getRetString(1,"BulkchainChaincode Invoke matchDeliveryRequest DelCompositeKey failed")
+				return shim.Error(res)
+			}
+
+
+		}
+
 	}
 
 	//return matching results
 	return shim.Success(nil)	
 }
+
+
+
+//confirm the PledgeRequest
+//args: 0 - PledgeRequest
+func (a *mychaincode) confirmDeliveryRequest(stub shim.ChaincodeStubInterface,args []string) pb.Response {
+	if len(args) != 1 {
+		res := getRetString(1,"BulkchainChaincode Invoke confirmPledgeRequest args != 1")
+		return shim.Error(res)
+	}
+
+	var checkResult PledgeRequest
+	err := json.Unmarshal([]byte(args[0]),&checkResult)
+	if err != nil {
+		res := getRetString(1,"BulkchainChaincode Invoke confirmPledgeRequest unmarshal request failed")
+		return shim.Error(res)
+	}
+
+	tx,hasReq := a.getRequest(stub,checkResult.TransactionId)
+	if !hasReq {
+		res := getRetString(1,"BulkchainChaincode Invoke confirmPledgeRequest request does not exist")
+		return shim.Error(res)
+	}
+
+	var request PledgeRequest
+	err = json.Unmarshal(tx.Content,&request)
+	if err != nil {
+		res := getRetString(1,"BulkchainChaincode Invoke confirmPledgeRequest unmarshal request failed")
+		return shim.Error(res)
+	}
+
+	//validate
+	if checkResult.ConfirmState != ConfirmState_ConfirmRejected && checkResult.ConfirmState != ConfirmState_ConfirmResolved {
+		res := getRetString(1,"BulkchainChaincode Invoke confirmPledgeRequest ConfirmState is invalid")
+		return shim.Error(res)
+	}
+	if request.CheckState != Check_State_CheckedResolved || request.ConfirmState != ConfirmState_Confirming {
+		res := getRetString(1,"BulkchainChaincode Invoke confirmPledgeRequest request should be resolved")
+		return shim.Error(res)
+	} 
+
+	request.ConfirmState = checkResult.ConfirmState
+
+	if !reflect.DeepEqual(request,checkResult) {
+		res := getRetString(1,"BulkchainChaincode Invoke confirmPledgeRequest request info was modified unexpectedly")
+		return shim.Error(res)
+	}
+
+	//check the wr 
+	wr,bWr := a.getWarehouseReceipt(stub,request.PledgingWarehouseReceiptSeriesId)
+	if !bWr {
+		res := getRetString(1,"BulkchainChaincode Invoke confirmPledgeRequest the registering warehousereceipt does not exist")
+		return shim.Error(res)
+	}
+	if request.ConfirmState == ConfirmState_ConfirmRejected {
+		wr.State = State_FLOWABLE
+	} else {
+		wr.State = State_PLEDGED
+	}
+	_,pWr := a.putWarehouseReceipt(stub,wr)
+	if !pWr {
+		res := getRetString(1,"BulkchainChaincode Invoke confirmPledgeRequest put WarehouseReceipt failed")
+		return shim.Error(res)
+	}
+
+	//put the request
+	request.PledgingWarehouseReceipt = wr
+	bReq,err := json.Marshal(request)
+	if err != nil {
+		res := getRetString(1,"BulkchainChaincode Invoke confirmPledgeRequest marshal request failed")
+		return shim.Error(res)
+	}
+	tx.Content = bReq
+	_,bTx := a.putRequest(stub,tx)
+	if !bTx {
+		res := getRetString(1,"BulkchainChaincode Invoke confirmPledgeRequest put request failed")
+		return shim.Error(res)
+	}
+
+	res := getRetByte(0,"BulkchainChaincode Invoke checkRegisterRequest success")
+	return shim.Success(res)
+}
+
+
 
 //send PledgeRequest
 //args: 0 - PledgeReuqest
@@ -2653,7 +2784,6 @@ func (a *mychaincode) queryMyWarehouseReceipts(stub shim.ChaincodeStubInterface,
 
 
 
-
 // chaincode Init 接口
 func (a *mychaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
 	//varieties info 
@@ -2718,6 +2848,8 @@ func (a *mychaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
     		return a.confirmPledgeRequest(stub,args) 
     	case "sendUnpledgeRequest":
     		return a.sendUnpledgeRequest(stub,args)
+    	case "checkUnpledgeRequest":
+    		return a.checkUnpledgeRequest(stub, args)
     	case "sendUnregisterRequest":
     		return a.sendUnregisterRequest(stub,args)
     	case "checkUnregisterRequest":
