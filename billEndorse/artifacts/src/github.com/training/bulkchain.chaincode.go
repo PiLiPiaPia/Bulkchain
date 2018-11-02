@@ -1371,7 +1371,7 @@ func (a *mychaincode) matchDeliveryRequest(stub shim.ChaincodeStubInterface,args
 		matchSellerState := make(map[string]bool)
 		matchBuyerState := make(map[string]bool)
 		//initialize
-		for buyerTxId,buyerQuantity := range buyerReqs {
+		for buyerTxId,_ := range buyerReqs {
 			matchBuyerState[buyerTxId] = false
 		}
 			
@@ -1560,7 +1560,6 @@ func (a *mychaincode) matchDeliveryRequest(stub shim.ChaincodeStubInterface,args
 		}
 
 		//delete sellers keys
-		sellerReqs := make(map[string]int)
 		for sellerTxIdIterator.HasNext() {
 			kv,_ := sellerTxIdIterator.Next()
 			_,compositeKeyParts,err := stub.SplitCompositeKey(kv.Key)
